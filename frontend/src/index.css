@@ -1,0 +1,182 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 6%;
+    --foreground: 220 10% 94%;
+
+    --card: 220 18% 10%;
+    --card-foreground: 220 10% 94%;
+
+    --popover: 220 18% 10%;
+    --popover-foreground: 220 10% 94%;
+
+    --primary: 160 84% 45%;
+    --primary-foreground: 220 20% 6%;
+
+    --secondary: 220 14% 16%;
+    --secondary-foreground: 220 10% 80%;
+
+    --muted: 220 14% 14%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 220 14% 18%;
+    --accent-foreground: 220 10% 94%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 14% 18%;
+    --input: 220 14% 18%;
+    --ring: 160 84% 45%;
+
+    --radius: 0.75rem;
+
+    /* Risk level colors */
+    --exact: 160 84% 45%;
+    --exact-glow: 160 84% 45%;
+    --low: 45 93% 50%;
+    --low-glow: 45 93% 50%;
+    --medium: 25 95% 55%;
+    --medium-glow: 25 95% 55%;
+    --critical: 0 72% 55%;
+    --critical-glow: 0 72% 55%;
+    --error: 280 70% 50%;
+    --error-glow: 280 70% 50%;
+
+    /* Gradients */
+    --gradient-exact: linear-gradient(135deg, hsl(160 84% 45%), hsl(160 70% 35%));
+    --gradient-low: linear-gradient(135deg, hsl(45 93% 50%), hsl(45 80% 40%));
+    --gradient-medium: linear-gradient(135deg, hsl(25 95% 55%), hsl(25 80% 45%));
+    --gradient-critical: linear-gradient(135deg, hsl(0 72% 55%), hsl(0 60% 45%));
+    --gradient-error: linear-gradient(135deg, hsl(280 70% 50%), hsl(280 60% 40%));
+
+    /* Shadows */
+    --shadow-exact: 0 4px 24px -4px hsl(160 84% 45% / 0.35);
+    --shadow-low: 0 4px 24px -4px hsl(45 93% 50% / 0.35);
+    --shadow-medium: 0 4px 24px -4px hsl(25 95% 55% / 0.35);
+    --shadow-critical: 0 4px 24px -4px hsl(0 72% 55% / 0.35);
+    --shadow-error: 0 4px 24px -4px hsl(280 70% 50% / 0.35);
+    --shadow-card: 0 4px 40px -12px hsl(220 20% 0% / 0.5);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl;
+  }
+
+  .risk-exact {
+    --risk-color: var(--exact);
+    --risk-glow: var(--exact-glow);
+    --risk-gradient: var(--gradient-exact);
+    --risk-shadow: var(--shadow-exact);
+  }
+
+  .risk-low {
+    --risk-color: var(--low);
+    --risk-glow: var(--low-glow);
+    --risk-gradient: var(--gradient-low);
+    --risk-shadow: var(--shadow-low);
+  }
+
+  .risk-medium {
+    --risk-color: var(--medium);
+    --risk-glow: var(--medium-glow);
+    --risk-gradient: var(--gradient-medium);
+    --risk-shadow: var(--shadow-medium);
+  }
+
+  .risk-critical {
+    --risk-color: var(--critical);
+    --risk-glow: var(--critical-glow);
+    --risk-gradient: var(--gradient-critical);
+    --risk-shadow: var(--shadow-critical);
+  }
+
+  .risk-error {
+    --risk-color: var(--error);
+    --risk-glow: var(--error-glow);
+    --risk-gradient: var(--gradient-error);
+    --risk-shadow: var(--shadow-error);
+  }
+}
+
+@layer utilities {
+  .animate-spin-slow {
+    animation: spin 2s linear infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.02);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out forwards;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-down {
+    animation: slide-down 0.3s ease-out forwards;
+  }
+
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 2000px;
+    }
+  }
+}

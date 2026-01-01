@@ -1,0 +1,107 @@
+[
+    {
+      "_id": {
+        "$oid": "68bd606eaa3704269abe43bb"
+      },
+      "fromMerchant": "Gelani_Garments",
+      "toUser": "yasir12",
+      "coins": 536,
+      "merchantCoinType": "Gelani_Garments Coins",
+      "type": "award",
+      "details": "",
+      "receiptNumber": "335",
+      "receiptPhotoUrl": "https://upcdn.io/kW2K8TT/raw/uploads/2025/09/07/4jXMMGBpJe-335.png",
+      "reason": "Sale",
+      "memo": "",
+      "operator": "majid",
+      "referenceId": "GMY7174220250907",
+      "timestamp": {
+        "$date": "2025-09-07T10:37:34.597Z"
+      },
+      "__v": 0
+    },
+    {
+        "_id": {
+          "$oid": "68c686a5aa3704269ac0c711"
+        },
+        "fromMerchant": "Gelani_Garments",
+        "toUser": "naseer",
+        "coins": 431,
+        "merchantCoinType": "Gelani_Garments Coins",
+        "type": "award",
+        "details": "",
+        "receiptNumber": "1049",
+        "receiptPhotoUrl": "https://upcdn.io/kW2K8TT/raw/uploads/2025/09/14/4jWSN6HK4m-1049.png",
+        "reason": "Sale",
+        "memo": "",
+        "operator": "kashan",
+        "referenceId": "GKN5484020250914",
+        "timestamp": {
+          "$date": "2025-09-14T09:11:01.663Z"
+        },
+        "__v": 0
+      },
+      {
+        "_id": {
+          "$oid": "68c687c4aa3704269ac0c9ab"
+        },
+        "fromMerchant": "Gelani_Garments",
+        "toUser": "ali",
+        "coins": 251,
+        "merchantCoinType": "Gelani_Garments Coins",
+        "type": "award",
+        "details": "",
+        "receiptNumber": "310",
+        "receiptPhotoUrl": "https://upcdn.io/kW2K8TT/raw/uploads/2025/09/14/4jWSLcXnC9-310.png",
+        "reason": "Sale",
+        "memo": "",
+        "operator": "majid",
+        "referenceId": "GMA3571220250914",
+        "timestamp": {
+          "$date": "2025-09-14T09:15:48.210Z"
+        },
+        "__v": 0
+      },
+      {
+      "_id": {
+        "$oid": "68c6937aaa3704269ac0d021"
+      },
+      "fromMerchant": "Gelani_Garments",
+      "toUser": "15501@Irshad",
+      "coins": 887,
+      "merchantCoinType": "Gelani_Garments Coins",
+      "type": "award",
+      "details": "",
+      "receiptNumber": "1050",
+      "receiptPhotoUrl": "https://upcdn.io/kW2K8TT/raw/uploads/2025/09/14/4jWS5J7xGJ-1050.png",
+      "reason": "Sale",
+      "memo": "",
+      "operator": "kashan",
+      "referenceId": "GK15985020250914",
+      "timestamp": {
+        "$date": "2025-09-14T10:05:46.720Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "68c6ce00aa3704269ac0e368"
+      },
+      "fromMerchant": "Gelani_Garments",
+      "toUser": "naseer",
+      "coins": 120,
+      "merchantCoinType": "Gelani_Garments Coins",
+      "type": "award",
+      "details": "",
+      "receiptNumber": "90074",
+      "receiptPhotoUrl": "https://upcdn.io/kW2K8TT/raw/uploads/2025/09/14/4jWQkV5REe-90074.png",
+      "reason": "Sale",
+      "memo": "",
+      "operator": "majid",
+      "referenceId": "GMN6805120250914",
+      "timestamp": {
+        "$date": "2025-09-14T14:15:28.535Z"
+      },
+      "__v": 0
+    }
+]

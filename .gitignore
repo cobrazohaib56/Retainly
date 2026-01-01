@@ -1,0 +1,4 @@
+venv-retainly/
+node_modules/
+
+.env
