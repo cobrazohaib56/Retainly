@@ -78,7 +78,7 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
           </div>
           
           {/* Receipt image */}
-          <div className="relative w-32 h-40 shrink-0">
+          <div className="relative w-48 h-60 shrink-0">
             {!imageLoaded && !imageError && (
               <div className="absolute inset-0 bg-secondary rounded-lg animate-pulse" />
             )}
@@ -186,7 +186,7 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
         </div>
 
         {/* Receipt image */}
-        <div className="relative w-36 h-44 shrink-0">
+        <div className="relative w-56 h-64 shrink-0">
           {!analysisImageLoaded && !analysisImageError && (
             <div className="absolute inset-0 bg-secondary rounded-lg animate-pulse" />
           )}
