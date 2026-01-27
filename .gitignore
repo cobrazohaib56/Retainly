@@ -2,3 +2,6 @@ venv-retainly/
 node_modules/
 
 .env
+
+receipt_images/
+uploads/images/

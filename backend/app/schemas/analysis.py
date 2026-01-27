@@ -20,7 +20,8 @@ class AnalysisEntryResponse(BaseModel):
     category: str
     receipt_photo_url: str
     image_path: Optional[str] = None
-    gemini_raw_response: Optional[str] = None
+    azure_raw_response: Optional[str] = None
+    extraction_confidence: Optional[float] = None
 
 
 class ErrorEntryResponse(BaseModel):

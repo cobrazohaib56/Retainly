@@ -7,6 +7,8 @@ from app.services.ai_pipeline_service import process_dataset
 from app.core.config import settings
 from app.schemas.analysis import AnalysisResponse
 from typing import Set
+from bson import ObjectId
+
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -104,7 +106,6 @@ async def process_file_background(file_path: str, analysis_id: str, filename: st
         
         # Update analysis with results
         from app.core.database import get_database
-        from bson import ObjectId
         
         db = get_database()
         collection = db["analyses"]

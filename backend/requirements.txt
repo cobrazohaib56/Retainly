@@ -6,5 +6,6 @@ pydantic
 pydantic-settings
 python-multipart
 python-dotenv
-google-genai
+azure-ai-documentintelligence
+azure-core
 requests

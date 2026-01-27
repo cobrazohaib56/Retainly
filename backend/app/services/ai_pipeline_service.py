@@ -1,15 +1,24 @@
 import json
 import os
 import requests
-import google.genai as genai
 from typing import Dict, Any, List
 import logging
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.core.credentials import AzureKeyCredential
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Gemini API client
-# Note: API key is passed when creating the client or model
+# Initialize Azure Document Intelligence client
+def get_azure_client() -> DocumentIntelligenceClient:
+    """Get Azure Document Intelligence client instance"""
+    if not settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT or not settings.AZURE_DOCUMENT_INTELLIGENCE_API_KEY:
+        raise ValueError("Azure Document Intelligence credentials are not configured")
+    
+    return DocumentIntelligenceClient(
+        endpoint=settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT,
+        credential=AzureKeyCredential(settings.AZURE_DOCUMENT_INTELLIGENCE_API_KEY)
+    )
 
 def download_image(url: str, save_path: str) -> bool:
     """Download image from URL"""
@@ -25,84 +34,104 @@ def download_image(url: str, save_path: str) -> bool:
         return False
 
 def extract_family_coins_from_image(image_path: str) -> Dict[str, Any]:
-    """Extract family coins amount from receipt image using Gemini"""
+    """Extract family coins amount from receipt image using Azure Document Intelligence"""
     try:
-        # Create client with API key
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        # Initialize Azure Document Intelligence client
+        client = get_azure_client()
         
-        prompt = """
-        You are analyzing a receipt image. Your task is to find and extract the "family coins" amount from this receipt.
+        if not settings.AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID:
+            raise ValueError("Azure Document Intelligence model ID is not configured")
         
-        Please carefully examine the image and look for:
-        1. Any text that mentions "family coins", "Family Coins", "FAMILY COINS", or similar variations
-        2. The numerical value associated with family coins
-        3. Any related information about coins or rewards
+        # Open the image file and analyze with custom model
+        with open(image_path, "rb") as f:
+            # Start the analysis process using the custom trained model
+            poller = client.begin_analyze_document(
+                model_id=settings.AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID,
+                body=f
+            )
         
-        After analyzing the image, provide your response in the following JSON format:
-        {
-            "family_coins": [numeric_value]
-        }
+        # Wait for the result
+        result = poller.result()
         
-        If you cannot find family coins in the image, set the value to null:
-        {
-            "family_coins": null
-        }
+        # Dictionary to hold extracted data
+        extracted_data = {}
+        family_coins_value = None
+        family_coins_confidence = None
+        matched_field_name = None
         
-        Be very careful and accurate. Only extract the exact number you see for family coins.
-        """
-        
-        # Read image file
-        with open(image_path, 'rb') as f:
-            image_data = f.read()
-        
-        # Generate content using the client
-        # The new google-genai package uses Client with models.generate_content
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[
-                genai.types.Part.from_bytes(data=image_data, mime_type='image/jpeg'),
-                prompt
-            ]
-        )
-        
-        raw_response = response.text.strip()
-        
-        # Try to extract JSON from response
-        try:
-            # Remove markdown code blocks if present
-            if "```json" in raw_response:
-                raw_response = raw_response.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw_response:
-                raw_response = raw_response.split("```")[1].split("```")[0].strip()
+        # Iterate through the documents found
+        for document in result.documents:
+            logger.debug(f"      📄 Document type: {document.doc_type}")
             
-            result = json.loads(raw_response)
+            # Extract fields from the custom model
+            for field_name, field in document.fields.items():
+                # Get the text content and confidence score
+                value = field.content if field.content else None
+                confidence = field.confidence if field.confidence else 0.0
+                
+                extracted_data[field_name] = {
+                    "value": value,
+                    "confidence": confidence
+                }
+                
+                # Look for Family Coins field (case-insensitive matching)
+                field_name_lower = field_name.lower()
+                if "family" in field_name_lower and "coin" in field_name_lower:
+                    if value:
+                        # Try to extract numeric value from the field
+                        try:
+                            # Remove any non-numeric characters except minus sign
+                            import re
+                            numeric_str = re.sub(r'[^\d-]', '', str(value))
+                            if numeric_str:
+                                family_coins_value = int(numeric_str)
+                                family_coins_confidence = confidence
+                                matched_field_name = field_name
+                                logger.debug(f"      ✅ Found Family Coins in field '{field_name}': {family_coins_value} (Confidence: {confidence:.2%})")
+                        except (ValueError, TypeError):
+                            logger.warning(f"      ⚠️  Could not parse Family Coins value from field '{field_name}': {value}")
+        
+        # If Family Coins was found, return it
+        if family_coins_value is not None:
             return {
                 "success": True,
-                "family_coins": result.get("family_coins"),
-                "raw_response": raw_response
+                "family_coins": family_coins_value,
+                "raw_response": json.dumps(extracted_data, indent=2),
+                "confidence": family_coins_confidence,
+                "matched_field": matched_field_name
             }
-        except json.JSONDecodeError:
-            # Try to extract number from text response
-            import re
-            numbers = re.findall(r'\d+', raw_response)
-            if numbers:
-                return {
-                    "success": True,
-                    "family_coins": int(numbers[0]),
-                    "raw_response": raw_response
-                }
+        
+        # If no Family Coins found, check if we have any data at all
+        if extracted_data:
+            logger.warning(f"      ⚠️  Family Coins field not found in extracted data. Available fields: {list(extracted_data.keys())}")
             return {
                 "success": False,
                 "family_coins": None,
-                "raw_response": raw_response
+                "raw_response": json.dumps(extracted_data, indent=2),
+                "available_fields": list(extracted_data.keys())
             }
-            
-    except Exception as e:
-        logger.error(f"   ❌ Gemini API error: {e}")
+        
+        # No data extracted at all
         return {
             "success": False,
             "family_coins": None,
-            "raw_response": str(e)
+            "raw_response": "No data extracted from document",
+            "available_fields": []
+        }
+            
+    except ValueError as e:
+        logger.error(f"   ❌ Configuration error: {e}")
+        return {
+            "success": False,
+            "family_coins": None,
+            "raw_response": f"Configuration error: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"   ❌ Azure Document Intelligence API error: {e}")
+        return {
+            "success": False,
+            "family_coins": None,
+            "raw_response": f"Azure API error: {str(e)}"
         }
 
 def categorize_difference(difference: int) -> str:
@@ -184,8 +213,8 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
             
             logger.info(f"      ✅ Image downloaded: {image_path}")
             
-            # Extract family coins using Gemini
-            logger.info(f"      🤖 Analyzing image with Gemini...")
+            # Extract family coins using Azure Document Intelligence
+            logger.info(f"      🤖 Analyzing image with Azure Document Intelligence...")
             extraction_result = extract_family_coins_from_image(image_path)
             
             if not extraction_result["success"] or extraction_result["family_coins"] is None:
@@ -223,7 +252,8 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 "category": category,
                 "receipt_photo_url": receipt_photo_url,
                 "image_path": image_path,
-                "gemini_raw_response": extraction_result.get("raw_response")
+                "azure_raw_response": extraction_result.get("raw_response"),
+                "extraction_confidence": extraction_result.get("confidence")
             }
             
             # Add to appropriate category
