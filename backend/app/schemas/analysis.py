@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.models.analysis import (
     AnalysisEntry,
     ErrorEntry,
+    NoImageEntry,
     AnalysisSummary
 )
 
@@ -31,6 +32,16 @@ class ErrorEntryResponse(BaseModel):
     error: str
     receipt_photo_url: str
     dataset_coins: int
+    reference_id: Optional[str] = None
+
+
+class NoImageEntryResponse(BaseModel):
+    entry_id: str
+    receipt_number: str
+    to_user: str
+    from_merchant: Optional[str] = None
+    dataset_coins: int
+    reference_id: Optional[str] = None
 
 
 class AnalysisSummaryResponse(BaseModel):
@@ -42,6 +53,7 @@ class AnalysisSummaryResponse(BaseModel):
     medium_rank_count: int
     critical_rank_count: int
     error_count: int
+    no_image_count: int
 
 
 class AnalysisDataResponse(BaseModel):
@@ -51,6 +63,7 @@ class AnalysisDataResponse(BaseModel):
     medium_rank: List[AnalysisEntryResponse]
     critical_rank: List[AnalysisEntryResponse]
     errors: List[ErrorEntryResponse]
+    no_image: List[NoImageEntryResponse]
 
 
 class AnalysisResponse(BaseModel):

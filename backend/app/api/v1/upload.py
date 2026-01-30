@@ -59,13 +59,15 @@ async def upload_file(
                 "low_rank_count": 0,
                 "medium_rank_count": 0,
                 "critical_rank_count": 0,
-                "error_count": 0
+                "error_count": 0,
+                "no_image_count": 0
             },
             "exact_match": [],
             "low_rank": [],
             "medium_rank": [],
             "critical_rank": [],
-            "errors": []
+            "errors": [],
+            "no_image": []
         }
         
         analysis_id = await AnalysisService.create_analysis(file.filename, initial_data)

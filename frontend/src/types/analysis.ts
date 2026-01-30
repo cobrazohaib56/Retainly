@@ -19,6 +19,16 @@ export interface ErrorEntry {
   error: string;
   receipt_photo_url: string;
   dataset_coins: number;
+  reference_id?: string;
+}
+
+export interface NoImageEntry {
+  entry_id: string;
+  receipt_number: string;
+  to_user: string;
+  from_merchant?: string;
+  dataset_coins: number;
+  reference_id?: string;
 }
 
 export interface AnalysisSummary {
@@ -30,6 +40,7 @@ export interface AnalysisSummary {
   medium_rank_count: number;
   critical_rank_count: number;
   error_count: number;
+  no_image_count: number;
 }
 
 export interface AnalysisData {
@@ -39,6 +50,7 @@ export interface AnalysisData {
   medium_rank: AnalysisEntry[];
   critical_rank: AnalysisEntry[];
   errors: ErrorEntry[];
+  no_image: NoImageEntry[];
 }
 
-export type RiskCategory = 'exact' | 'low' | 'medium' | 'critical' | 'error';
+export type RiskCategory = 'exact' | 'low' | 'medium' | 'critical' | 'error' | 'no_image';

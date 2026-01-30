@@ -24,6 +24,16 @@ export interface ErrorEntry {
   error: string;
   receipt_photo_url: string;
   dataset_coins: number;
+  reference_id?: string;
+}
+
+export interface NoImageEntry {
+  entry_id: string;
+  receipt_number: string;
+  to_user: string;
+  from_merchant?: string;
+  dataset_coins: number;
+  reference_id?: string;
 }
 
 export interface AnalysisSummary {
@@ -35,6 +45,7 @@ export interface AnalysisSummary {
   medium_rank_count: number;
   critical_rank_count: number;
   error_count: number;
+  no_image_count: number;
 }
 
 export interface AnalysisData {
@@ -44,6 +55,7 @@ export interface AnalysisData {
   medium_rank: AnalysisEntry[];
   critical_rank: AnalysisEntry[];
   errors: ErrorEntry[];
+  no_image: NoImageEntry[];
 }
 
 export interface AnalysisResponse {
@@ -63,7 +75,7 @@ export interface HistoryResponse {
 export interface CategoryResponse {
   analysis_id: string;
   category: string;
-  entries: (AnalysisEntry | ErrorEntry)[];
+  entries: (AnalysisEntry | ErrorEntry | NoImageEntry)[];
   count: number;
 }
 
@@ -173,7 +185,7 @@ export async function getAnalysis(analysisId: string): Promise<AnalysisResponse>
  */
 export async function getCategoryEntries(
   analysisId: string,
-  category: 'exact' | 'low' | 'medium' | 'critical' | 'error'
+  category: 'exact' | 'low' | 'medium' | 'critical' | 'error' | 'no_image'
 ): Promise<CategoryResponse> {
   const response = await fetch(`${API_BASE_URL}/analysis/${analysisId}/category/${category}`);
 

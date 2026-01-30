@@ -40,6 +40,15 @@ class ErrorEntry(BaseModel):
     error: str
     receipt_photo_url: str
     dataset_coins: int
+    reference_id: Optional[str] = None
+
+class NoImageEntry(BaseModel):
+    entry_id: str
+    receipt_number: str
+    to_user: str
+    from_merchant: Optional[str] = None
+    dataset_coins: int
+    reference_id: Optional[str] = None
 
 class AnalysisSummary(BaseModel):
     total_entries: int
@@ -50,6 +59,7 @@ class AnalysisSummary(BaseModel):
     medium_rank_count: int
     critical_rank_count: int
     error_count: int
+    no_image_count: int
 
 class AnalysisData(BaseModel):
     summary: AnalysisSummary
@@ -58,6 +68,7 @@ class AnalysisData(BaseModel):
     medium_rank: List[AnalysisEntry]
     critical_rank: List[AnalysisEntry]
     errors: List[ErrorEntry]
+    no_image: List[NoImageEntry]
 
 class AnalysisDocument(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id", exclude=True)

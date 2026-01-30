@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getCategoryEntries, AnalysisEntry, ErrorEntry } from '@/lib/api';
+import { getCategoryEntries, AnalysisEntry, ErrorEntry, NoImageEntry } from '@/lib/api';
 import { EntryCard } from '@/components/EntryCard';
 import { RiskCategory } from '@/types/analysis';
-import { ArrowLeft, FileJson, CheckCircle2, AlertTriangle, AlertOctagon, XCircle } from 'lucide-react';
+import { ArrowLeft, FileJson, CheckCircle2, AlertTriangle, AlertOctagon, XCircle, ImageOff } from 'lucide-react';
 
 const categoryConfig: Record<string, { 
   key: RiskCategory; 
@@ -41,11 +41,17 @@ const categoryConfig: Record<string, {
     description: 'Entries that failed during processing',
     icon: XCircle,
   },
+  no_image: {
+    key: 'no_image',
+    label: 'No Image',
+    description: 'Entries missing receipt photo URL',
+    icon: ImageOff,
+  },
 };
 
 const CategoryPage = () => {
   const { id, category } = useParams<{ id: string; category: string }>();
-  const [entries, setEntries] = useState<(AnalysisEntry | ErrorEntry)[]>([]);
+  const [entries, setEntries] = useState<(AnalysisEntry | ErrorEntry | NoImageEntry)[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const config = category ? categoryConfig[category] : null;
@@ -59,7 +65,7 @@ const CategoryPage = () => {
 
     const fetchEntries = async () => {
       try {
-        const data = await getCategoryEntries(id, category as 'exact' | 'low' | 'medium' | 'critical' | 'error');
+        const data = await getCategoryEntries(id, category as 'exact' | 'low' | 'medium' | 'critical' | 'error' | 'no_image');
         setEntries(data.entries);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load entries');

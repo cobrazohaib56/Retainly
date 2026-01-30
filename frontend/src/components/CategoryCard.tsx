@@ -1,6 +1,6 @@
 import { RiskCategory } from '@/types/analysis';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertTriangle, AlertOctagon, XCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, AlertOctagon, XCircle, ArrowRight, ImageOff } from 'lucide-react';
 
 interface CategoryCardProps {
   category: RiskCategory;
@@ -44,6 +44,13 @@ const categoryConfig = {
     icon: XCircle,
     className: 'risk-error',
     path: 'error',
+  },
+  no_image: {
+    label: 'No Image',
+    description: 'Missing photo URL',
+    icon: ImageOff,
+    className: 'risk-error',
+    path: 'no_image',
   },
 };
 

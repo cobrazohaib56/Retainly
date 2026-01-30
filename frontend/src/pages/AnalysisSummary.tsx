@@ -80,6 +80,7 @@ const AnalysisSummary = () => {
     { key: 'medium', count: data.summary.medium_rank_count },
     { key: 'critical', count: data.summary.critical_rank_count },
     { key: 'error', count: data.summary.error_count },
+    { key: 'no_image', count: data.summary.no_image_count },
   ];
 
   return (

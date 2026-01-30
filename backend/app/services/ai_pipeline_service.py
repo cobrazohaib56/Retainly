@@ -168,6 +168,7 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
     medium_rank = []
     critical_rank = []
     errors = []
+    no_image = []
     
     processed = 0
     
@@ -179,19 +180,20 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
             dataset_coins = entry.get("coins", 0)
             to_user = entry.get("toUser", "Unknown")
             from_merchant = entry.get("fromMerchant")
+            reference_id = entry.get("referenceId") or entry.get("reference_id")
             
             logger.info(f"   🔄 [{entry_idx}/{total_entries}] Processing: {receipt_number}")
             logger.info(f"      📊 Dataset coins: {dataset_coins}")
             
             if not receipt_photo_url:
                 logger.warning(f"      ⚠️  No receipt photo URL, skipping")
-                errors.append({
+                no_image.append({
                     "entry_id": str(entry_idx),
                     "receipt_number": receipt_number,
                     "to_user": to_user,
-                    "error": "No receipt photo URL",
-                    "receipt_photo_url": "",
-                    "dataset_coins": dataset_coins
+                    "from_merchant": from_merchant,
+                    "dataset_coins": dataset_coins,
+                    "reference_id": reference_id
                 })
                 continue
             
@@ -207,7 +209,8 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                     "to_user": to_user,
                     "error": "Failed to download image",
                     "receipt_photo_url": receipt_photo_url,
-                    "dataset_coins": dataset_coins
+                    "dataset_coins": dataset_coins,
+                    "reference_id": reference_id
                 })
                 continue
             
@@ -225,7 +228,8 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                     "to_user": to_user,
                     "error": f"Failed to extract family coins: {extraction_result.get('raw_response', 'Unknown error')}",
                     "receipt_photo_url": receipt_photo_url,
-                    "dataset_coins": dataset_coins
+                    "dataset_coins": dataset_coins,
+                    "reference_id": reference_id
                 })
                 continue
             
@@ -288,7 +292,8 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 "to_user": entry.get("toUser", "Unknown"),
                 "error": str(e),
                 "receipt_photo_url": entry.get("receiptPhotoUrl", ""),
-                "dataset_coins": entry.get("coins", 0)
+                "dataset_coins": entry.get("coins", 0),
+                "reference_id": entry.get("referenceId") or entry.get("reference_id")
             })
     
     # Create summary
@@ -300,7 +305,8 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
         "low_rank_count": len(low_rank),
         "medium_rank_count": len(medium_rank),
         "critical_rank_count": len(critical_rank),
-        "error_count": len(errors)
+        "error_count": len(errors),
+        "no_image_count": len(no_image)
     }
     
     logger.info(f"✅ Processing complete!")
@@ -312,6 +318,7 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
     logger.info(f"      Medium Rank: {summary['medium_rank_count']}")
     logger.info(f"      Critical Rank: {summary['critical_rank_count']}")
     logger.info(f"      Errors: {summary['error_count']}")
+    logger.info(f"      No Image: {summary['no_image_count']}")
     
     return {
         "summary": summary,
@@ -319,5 +326,6 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
         "low_rank": low_rank,
         "medium_rank": medium_rank,
         "critical_rank": critical_rank,
-        "errors": errors
+        "errors": errors,
+        "no_image": no_image
     }

@@ -18,7 +18,7 @@ async def get_analysis(analysis_id: str = Path(..., description="Analysis ID")):
 @router.get("/{analysis_id}/category/{category}")
 async def get_category_entries(
     analysis_id: str = Path(..., description="Analysis ID"),
-    category: Literal["exact", "low", "medium", "critical", "error"] = Path(..., description="Category")
+    category: Literal["exact", "low", "medium", "critical", "error", "no_image"] = Path(..., description="Category")
 ):
     
     analysis = await AnalysisService.get_analysis_by_id(analysis_id)
@@ -31,7 +31,8 @@ async def get_category_entries(
         "low": "low_rank",
         "medium": "medium_rank",
         "critical": "critical_rank",
-        "error": "errors"
+        "error": "errors",
+        "no_image": "no_image"
     }
     
     data_key = category_map.get(category)

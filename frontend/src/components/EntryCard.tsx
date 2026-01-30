@@ -1,16 +1,20 @@
-import { AnalysisEntry, ErrorEntry, RiskCategory } from '@/types/analysis';
-import { Coins, ArrowRight, User, Receipt, ExternalLink, AlertCircle } from 'lucide-react';
+import { AnalysisEntry, ErrorEntry, NoImageEntry, RiskCategory } from '@/types/analysis';
+import { Coins, ArrowRight, User, Receipt, ExternalLink, AlertCircle, ImageOff } from 'lucide-react';
 import { useState } from 'react';
 import { getImageUrl } from '@/lib/api';
 
 interface EntryCardProps {
-  entry: AnalysisEntry | ErrorEntry;
+  entry: AnalysisEntry | ErrorEntry | NoImageEntry;
   category: RiskCategory;
   index: number;
 }
 
-const isErrorEntry = (entry: AnalysisEntry | ErrorEntry): entry is ErrorEntry => {
+const isErrorEntry = (entry: AnalysisEntry | ErrorEntry | NoImageEntry): entry is ErrorEntry => {
   return 'error' in entry;
+};
+
+const isNoImageEntry = (entry: AnalysisEntry | ErrorEntry | NoImageEntry): entry is NoImageEntry => {
+  return !('error' in entry) && !('extracted_family_coins' in entry);
 };
 
 export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
@@ -25,7 +29,70 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
     medium: 'risk-medium',
     critical: 'risk-critical',
     error: 'risk-error',
+    no_image: 'risk-error',
   }[category];
+
+  if (isNoImageEntry(entry)) {
+    return (
+      <div 
+        className={`glass-card p-6 ${categoryClassName} animate-fade-in`}
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Receipt className="w-4 h-4" />
+                <span className="font-mono">#{entry.receipt_number}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                <span>{entry.to_user}</span>
+              </div>
+              {entry.from_merchant && (
+                <span className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground">
+                  {entry.from_merchant}
+                </span>
+              )}
+            </div>
+            {entry.reference_id && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-mono mt-1">
+                <span className="uppercase tracking-wide text-[0.65rem]">Ref ID:</span>
+                <span className="text-foreground">{entry.reference_id}</span>
+              </div>
+            )}
+            
+            <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 mt-3">
+              <div className="flex items-start gap-2">
+                <ImageOff className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm text-warning/90 font-medium">
+                    Missing receipt photo URL
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This entry cannot be processed without an image
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Expected coins:</span>
+              <span className="font-mono font-semibold text-foreground">{entry.dataset_coins}</span>
+            </div>
+          </div>
+          
+          {/* No image placeholder */}
+          <div className="relative w-48 h-60 shrink-0">
+            <div className="absolute inset-0 bg-secondary rounded-lg flex flex-col items-center justify-center gap-2">
+              <ImageOff className="w-12 h-12 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">No Image</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isErrorEntry(entry)) {
     const shouldTruncate = entry.error.length > 200;
@@ -50,6 +117,12 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
                 <span>{entry.to_user}</span>
               </div>
             </div>
+            {entry.reference_id && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground font-mono mt-1">
+                <span className="uppercase tracking-wide text-[0.65rem]">Ref ID:</span>
+                <span className="text-foreground">{entry.reference_id}</span>
+              </div>
+            )}
             
             <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
               <div className="flex items-start gap-2">
