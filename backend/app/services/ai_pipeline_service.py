@@ -1,4 +1,5 @@
 import json
+import csv
 import os
 import requests
 from typing import Dict, Any, List
@@ -134,6 +135,76 @@ def extract_family_coins_from_image(image_path: str) -> Dict[str, Any]:
             "raw_response": f"Azure API error: {str(e)}"
         }
 
+def _normalize_csv_key(key: str) -> str:
+    """Convert snake_case to camelCase for CSV column names"""
+    parts = key.strip().split("_")
+    if len(parts) == 1:
+        return parts[0].lower()
+    return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
+
+
+def load_dataset(file_path: str) -> List[Dict[str, Any]]:
+    """Load dataset from JSON or CSV file. Returns list of dicts with camelCase keys."""
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    if ext == ".json":
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            raise ValueError("JSON file must contain an array of objects")
+        return data
+    
+    if ext == ".csv":
+        with open(file_path, "r", encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        
+        if not rows:
+            raise ValueError("CSV file is empty or has no data rows")
+        
+        # Normalize keys: support both camelCase and snake_case
+        # Map common variations to expected camelCase keys
+        key_aliases = {
+            "receiptnumber": "receiptNumber",
+            "receipt_number": "receiptNumber",
+            "receiptphotourl": "receiptPhotoUrl",
+            "receipt_photo_url": "receiptPhotoUrl",
+            "touser": "toUser",
+            "to_user": "toUser",
+            "frommerchant": "fromMerchant",
+            "from_merchant": "fromMerchant",
+            "referenceid": "referenceId",
+            "reference_id": "referenceId",
+            "coins": "coins",
+        }
+        
+        result = []
+        for row in rows:
+            normalized = {}
+            for k, v in row.items():
+                key_lower = k.strip().lower().replace(" ", "").replace("-", "")
+                val = v.strip() if isinstance(v, str) else v
+                if key_lower in key_aliases:
+                    target_key = key_aliases[key_lower]
+                    normalized[target_key] = val
+                else:
+                    camel_key = _normalize_csv_key(k) if "_" in k or " " in k else k
+                    normalized[camel_key] = val
+            # Parse coins as int (required by pipeline)
+            if "coins" not in normalized:
+                normalized["coins"] = 0
+            else:
+                try:
+                    normalized["coins"] = int(float(str(normalized["coins"]).replace(",", "")))
+                except (ValueError, TypeError):
+                    normalized["coins"] = 0
+            result.append(normalized)
+        
+        return result
+    
+    raise ValueError(f"Unsupported file format: {ext}. Use .json or .csv")
+
+
 def categorize_difference(difference: int) -> str:
     """Categorize the difference between dataset coins and extracted coins"""
     if difference == 0:
@@ -148,16 +219,12 @@ def categorize_difference(difference: int) -> str:
         return "critical_rank"
 
 async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, Any]:
-    """Process the dataset file and extract family coins from images"""
+    """Process the dataset file (JSON or CSV) and extract family coins from images"""
     
     logger.info(f"📂 Loading dataset from: {file_path}")
     
-    # Load dataset
-    with open(file_path, 'r', encoding='utf-8') as f:
-        dataset = json.load(f)
-    
-    if not isinstance(dataset, list):
-        raise ValueError("Dataset must be a JSON array")
+    # Load dataset (supports JSON and CSV)
+    dataset = load_dataset(file_path)
     
     total_entries = len(dataset)
     logger.info(f"📊 Found {total_entries} entries to process")
@@ -181,6 +248,26 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
             to_user = entry.get("toUser", "Unknown")
             from_merchant = entry.get("fromMerchant")
             reference_id = entry.get("referenceId") or entry.get("reference_id")
+            
+            # Report current entry for live frontend updates (at start of processing)
+            if analysis_id:
+                try:
+                    from app.services.analysis_service import AnalysisService
+                    progress_pct = ((entry_idx - 1) / total_entries) * 100
+                    await AnalysisService.update_analysis_status(
+                        analysis_id,
+                        "processing",
+                        progress=progress_pct,
+                        current_entry={
+                            "receipt_number": receipt_number,
+                            "to_user": to_user,
+                            "entry_index": entry_idx,
+                            "total_entries": total_entries,
+                            "reference_id": reference_id
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"      ⚠️  Failed to update current entry: {e}")
             
             logger.info(f"   🔄 [{entry_idx}/{total_entries}] Processing: {receipt_number}")
             logger.info(f"      📊 Dataset coins: {dataset_coins}")

@@ -26,11 +26,11 @@ async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...)
 ):
-    """Upload a JSON file and start processing"""
+    """Upload a JSON or CSV file and start processing"""
     
     # Validate file type
-    if not file.filename.endswith('.json'):
-        raise HTTPException(status_code=400, detail="Only JSON files are allowed")
+    if not (file.filename.endswith('.json') or file.filename.endswith('.csv')):
+        raise HTTPException(status_code=400, detail="Only JSON and CSV files are allowed")
     
     # Create upload directory
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -118,7 +118,8 @@ async def process_file_background(file_path: str, analysis_id: str, filename: st
                 "$set": {
                     "data": result,
                     "status": "completed",
-                    "progress": 100.0
+                    "progress": 100.0,
+                    "current_entry": None
                 }
             }
         )
@@ -144,6 +145,14 @@ async def process_file_background(file_path: str, analysis_id: str, filename: st
         # Remove from tracking set
         if current_task:
             background_tasks_set.discard(current_task)
+
+        # Remove uploaded dataset file after processing so it isn't persisted
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"🧹 Removed uploaded dataset file: {file_path}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to remove uploaded file {file_path}: {e}")
 
 @router.get("/status/{analysis_id}", response_model=AnalysisResponse)
 async def get_processing_status(analysis_id: str):

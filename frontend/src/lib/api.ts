@@ -58,6 +58,14 @@ export interface AnalysisData {
   no_image: NoImageEntry[];
 }
 
+export interface CurrentEntry {
+  receipt_number: string;
+  to_user: string;
+  entry_index: number;
+  total_entries: number;
+  reference_id?: string;
+}
+
 export interface AnalysisResponse {
   id: string;
   filename: string;
@@ -65,6 +73,7 @@ export interface AnalysisResponse {
   data: AnalysisData;
   status: 'processing' | 'completed' | 'failed';
   progress?: number;
+  current_entry?: CurrentEntry | null;
 }
 
 export interface HistoryResponse {
@@ -133,7 +142,7 @@ export async function getStatus(analysisId: string): Promise<AnalysisResponse> {
  */
 export async function pollStatus(
   analysisId: string,
-  onProgress?: (progress: number) => void,
+  onProgress?: (progress: number, currentEntry?: CurrentEntry | null) => void,
   interval: number = 2000
 ): Promise<AnalysisResponse> {
   return new Promise((resolve, reject) => {
@@ -141,8 +150,8 @@ export async function pollStatus(
       try {
         const status = await getStatus(analysisId);
 
-        if (onProgress && status.progress !== undefined) {
-          onProgress(status.progress);
+        if (onProgress) {
+          onProgress(status.progress ?? 0, status.current_entry ?? null);
         }
 
         if (status.status === 'completed') {

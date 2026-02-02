@@ -6,25 +6,28 @@ import { uploadFile, pollStatus } from '@/lib/api';
 const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentEntry, setCurrentEntry] = useState<{ receipt_number: string; to_user: string; entry_index: number; total_entries: number; reference_id?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleFileLoaded = useCallback(async (file: File) => {
     setIsProcessing(true);
     setProgress(0);
+    setCurrentEntry(null);
     setError(null);
     
     try {
       // Upload file to backend
       const analysis = await uploadFile(file);
       
-      // Poll for status until completion
+      // Poll for status until completion (with live transaction updates)
       await pollStatus(
         analysis.id,
-        (progressValue) => {
+        (progressValue, entry) => {
           setProgress(progressValue || 0);
+          setCurrentEntry(entry ?? null);
         },
-        2000
+        1500
       );
       
       // Navigate to analysis page
@@ -44,7 +47,7 @@ const Index = () => {
           Analyze Your Results
         </h2>
         <p className="text-muted-foreground text-lg">
-          Upload your family coins analysis JSON to visualize the extraction results
+          Upload your family coins analysis (JSON or CSV) to visualize the extraction results
         </p>
       </div>
       
@@ -52,6 +55,7 @@ const Index = () => {
         onFileLoaded={handleFileLoaded} 
         isProcessing={isProcessing} 
         progress={progress}
+        currentEntry={currentEntry}
       />
 
       {error && (
@@ -62,7 +66,7 @@ const Index = () => {
 
       <div className="mt-8 text-center">
         <p className="text-sm text-muted-foreground">
-          Upload your JSON dataset to process receipt images and extract family coins
+          Upload your JSON or CSV dataset to process receipt images and extract family coins
         </p>
       </div>
     </div>

@@ -66,6 +66,15 @@ class AnalysisDataResponse(BaseModel):
     no_image: List[NoImageEntryResponse]
 
 
+class CurrentEntryResponse(BaseModel):
+    """Currently processing transaction (live update during analysis)"""
+    receipt_number: str
+    to_user: str
+    entry_index: int
+    total_entries: int
+    reference_id: Optional[str] = None
+
+
 class AnalysisResponse(BaseModel):
     id: str
     filename: str
@@ -73,6 +82,7 @@ class AnalysisResponse(BaseModel):
     data: AnalysisDataResponse
     status: str
     progress: Optional[float] = None
+    current_entry: Optional[CurrentEntryResponse] = None
 
 
 class HistoryResponse(BaseModel):

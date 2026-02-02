@@ -126,8 +126,13 @@ class AnalysisService:
             return False
     
     @staticmethod
-    async def update_analysis_status(analysis_id: str, status: str, progress: Optional[float] = None):
-        """Update analysis processing status"""
+    async def update_analysis_status(
+        analysis_id: str,
+        status: str,
+        progress: Optional[float] = None,
+        current_entry: Optional[Dict[str, Any]] = None
+    ):
+        """Update analysis processing status and optionally current entry being processed"""
         
         try:
             db = get_database()
@@ -135,6 +140,11 @@ class AnalysisService:
             update_data = {"status": status}
             if progress is not None:
                 update_data["progress"] = progress
+            if current_entry is not None:
+                update_data["current_entry"] = current_entry
+            elif status == "completed" or status == "failed":
+                # Clear current_entry when done
+                update_data["current_entry"] = None
             
             await collection.update_one(
                 {"_id": ObjectId(analysis_id)},
