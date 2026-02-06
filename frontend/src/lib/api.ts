@@ -1,5 +1,5 @@
-// const API_BASE_URL = 'http://localhost:8000/api/v1';
-const API_BASE_URL = 'http://74.162.89.220:8000/api/v1';
+const API_BASE_URL = 'http://localhost:8000/api/v1';
+// const API_BASE_URL = 'http://74.162.89.220:8000/api/v1';
 
 
 // Types matching backend schemas

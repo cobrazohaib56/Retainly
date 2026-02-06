@@ -14,25 +14,25 @@ const categoryConfig: Record<string, {
   exact: {
     key: 'exact',
     label: 'Exact Match',
-    description: 'Entries where extracted coins perfectly match the dataset',
+    description: 'Entries where receipt total matches expected fiat amount',
     icon: CheckCircle2,
   },
   low: {
     key: 'low',
     label: 'Low Risk',
-    description: 'Entries with minor discrepancy (≤10 coins difference)',
+    description: 'Entries with minor discrepancy (≤10 amount difference)',
     icon: AlertTriangle,
   },
   medium: {
     key: 'medium',
     label: 'Medium Risk',
-    description: 'Entries with moderate discrepancy (11-30 coins difference)',
+    description: 'Entries with moderate discrepancy (11-30 amount difference)',
     icon: AlertTriangle,
   },
   critical: {
     key: 'critical',
     label: 'Critical',
-    description: 'Entries with major discrepancy (>30 coins difference)',
+    description: 'Entries with major discrepancy (>30 amount difference)',
     icon: AlertOctagon,
   },
   error: {

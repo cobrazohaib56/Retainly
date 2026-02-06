@@ -8,10 +8,9 @@ load_dotenv()
 class Settings(BaseSettings):
     """Application settings"""
     
-    # Azure Document Intelligence
+    # Azure Document Intelligence (Prebuilt Receipt model only; no custom model)
     AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT", "")
     AZURE_DOCUMENT_INTELLIGENCE_API_KEY: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_API_KEY", "")
-    AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID: str = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID", "")
     
     # Database
     MONGODB_URL: str = os.getenv("MONGODB_URL")

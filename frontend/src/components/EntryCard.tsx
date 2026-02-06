@@ -77,7 +77,7 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
             </div>
             
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Expected coins:</span>
+              <span className="text-sm text-muted-foreground">Expected amount (fiat):</span>
               <span className="font-mono font-semibold text-foreground">{entry.dataset_coins}</span>
             </div>
           </div>
@@ -145,7 +145,7 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
             </div>
             
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Expected coins:</span>
+              <span className="text-sm text-muted-foreground">Expected amount (fiat):</span>
               <span className="font-mono font-semibold text-foreground">{entry.dataset_coins}</span>
             </div>
           </div>
@@ -219,10 +219,10 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
             )}
           </div>
 
-          {/* Coins comparison */}
+          {/* Amount comparison: expected fiat vs receipt total */}
           <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50">
             <div className="flex-1">
-              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual Coins</p>
+              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Expected (fiat)</p>
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5 text-muted-foreground" />
                 <span className="text-2xl font-bold font-mono text-foreground">
@@ -234,7 +234,7 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
             <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
             
             <div className="flex-1">
-              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Extracted</p>
+              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Receipt total</p>
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5" style={{ color: 'hsl(var(--risk-color))' }} />
                 <span 

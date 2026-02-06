@@ -1,6 +1,6 @@
 # Retainly Backend API
 
-FastAPI backend for processing receipt images and extracting family coins using Google Gemini AI.
+FastAPI backend for processing receipt images and extracting Total/Total Amount using Azure Prebuilt Receipt model.
 
 ## Setup
 
@@ -13,7 +13,8 @@ FastAPI backend for processing receipt images and extracting family coins using 
    ```env
    MONGODB_URL=mongodb://localhost:27017
    DATABASE_NAME=retainly
-   GEMINI_API_KEY=your_gemini_api_key_here
+   AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=your_azure_endpoint
+   AZURE_DOCUMENT_INTELLIGENCE_API_KEY=your_azure_api_key
    ```
 
 3. **Start MongoDB:**

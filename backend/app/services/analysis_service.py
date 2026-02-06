@@ -32,6 +32,22 @@ logger = logging.getLogger(__name__)
 
 class AnalysisService:
     @staticmethod
+    def _ensure_no_image_fields(analysis: Dict[str, Any]) -> None:
+        """
+        Backfill newer fields (no_image_count, no_image) for analyses
+        that were created before these fields existed in the schema.
+        """
+        try:
+            data = analysis.setdefault("data", {})
+            summary = data.setdefault("summary", {})
+            # Default no_image_count to 0 if missing
+            summary.setdefault("no_image_count", 0)
+            # Default no_image list to [] if missing
+            data.setdefault("no_image", [])
+        except Exception as e:
+            logger.warning(f"Error normalizing analysis document for no_image fields: {e}")
+
+    @staticmethod
     async def create_analysis(filename: str, data: Dict[str, Any]) -> str:
         """Create a new analysis document in MongoDB"""
         try:
@@ -69,6 +85,8 @@ class AnalysisService:
             if analysis:
                 analysis["id"] = str(analysis["_id"])
                 del analysis["_id"]
+                # Backfill missing no_image fields for older documents
+                AnalysisService._ensure_no_image_fields(analysis)
                 # Convert timestamp to GMT+5 timezone for display
                 if "timestamp" in analysis and analysis["timestamp"]:
                     if isinstance(analysis["timestamp"], datetime):
@@ -98,6 +116,8 @@ class AnalysisService:
         for analysis in analyses:
             analysis["id"] = str(analysis["_id"])
             del analysis["_id"]
+            # Backfill missing no_image fields for older documents
+            AnalysisService._ensure_no_image_fields(analysis)
             # Convert timestamp to GMT+5 timezone for display
             if "timestamp" in analysis and analysis["timestamp"]:
                 if isinstance(analysis["timestamp"], datetime):

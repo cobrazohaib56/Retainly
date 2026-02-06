@@ -1,8 +1,9 @@
 import json
 import csv
 import os
+import re
 import requests
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
@@ -10,7 +11,9 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Azure Document Intelligence client
+# Prebuilt Receipt model ID (Azure normalizes "Total", "Total Amount", "Grand Total" etc. to this field)
+PREBUILT_RECEIPT_MODEL_ID = "prebuilt-receipt"
+
 def get_azure_client() -> DocumentIntelligenceClient:
     """Get Azure Document Intelligence client instance"""
     if not settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT or not settings.AZURE_DOCUMENT_INTELLIGENCE_API_KEY:
@@ -34,106 +37,87 @@ def download_image(url: str, save_path: str) -> bool:
         logger.error(f"   ❌ Failed to download image {url}: {e}")
         return False
 
-def extract_family_coins_from_image(image_path: str) -> Dict[str, Any]:
-    """Extract family coins amount from receipt image using Azure Document Intelligence"""
+
+def _parse_total_value(value: Any) -> Optional[float]:
+    """Parse Total from receipt (handles '1,200.00', 1200, etc.)"""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip().replace(",", "").replace(" ", "")
+    # Remove currency symbols and leave digits, minus, dot
+    s = re.sub(r"[^\d.\-]", "", s)
+    if not s:
+        return None
     try:
-        # Initialize Azure Document Intelligence client
+        return float(s)
+    except ValueError:
+        return None
+
+
+def extract_total_from_receipt(image_path: str) -> Dict[str, Any]:
+    """Extract Total (or Total Amount) from receipt image using Azure Prebuilt Receipt model only.
+    The prebuilt model normalizes 'Total', 'Total Amount', 'Grand Total', etc. into a single 'Total' field.
+    No custom model is used.
+    """
+    try:
         client = get_azure_client()
-        
-        if not settings.AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID:
-            raise ValueError("Azure Document Intelligence model ID is not configured")
-        
-        # Open the image file and analyze with custom model
         with open(image_path, "rb") as f:
-            # Start the analysis process using the custom trained model
-            poller = client.begin_analyze_document(
-                model_id=settings.AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID,
-                body=f
-            )
-        
-        # Wait for the result
+            poller = client.begin_analyze_document(model_id=PREBUILT_RECEIPT_MODEL_ID, body=f)
         result = poller.result()
-        
-        # Dictionary to hold extracted data
+
         extracted_data = {}
-        family_coins_value = None
-        family_coins_confidence = None
-        matched_field_name = None
-        
-        # Iterate through the documents found
+        total_value = None
+        total_confidence = None
+
         for document in result.documents:
             logger.debug(f"      📄 Document type: {document.doc_type}")
-            
-            # Extract fields from the custom model
             for field_name, field in document.fields.items():
-                # Get the text content and confidence score
-                value = field.content if field.content else None
-                confidence = field.confidence if field.confidence else 0.0
-                
-                extracted_data[field_name] = {
-                    "value": value,
-                    "confidence": confidence
-                }
-                
-                # Look for Family Coins field (case-insensitive matching)
-                field_name_lower = field_name.lower()
-                if "family" in field_name_lower and "coin" in field_name_lower:
-                    if value:
-                        # Try to extract numeric value from the field
-                        try:
-                            # Remove any non-numeric characters except minus sign
-                            import re
-                            numeric_str = re.sub(r'[^\d-]', '', str(value))
-                            if numeric_str:
-                                family_coins_value = int(numeric_str)
-                                family_coins_confidence = confidence
-                                matched_field_name = field_name
-                                logger.debug(f"      ✅ Found Family Coins in field '{field_name}': {family_coins_value} (Confidence: {confidence:.2%})")
-                        except (ValueError, TypeError):
-                            logger.warning(f"      ⚠️  Could not parse Family Coins value from field '{field_name}': {value}")
-        
-        # If Family Coins was found, return it
-        if family_coins_value is not None:
+                value = getattr(field, "content", None) or getattr(field, "value", None)
+                confidence = getattr(field, "confidence", None) or 0.0
+                extracted_data[field_name] = {"value": value, "confidence": confidence}
+
+                # Prebuilt receipt uses "Total" (normalized from Total Amount, Grand Total, etc.)
+                if field_name == "Total":
+                    parsed = _parse_total_value(value)
+                    if parsed is not None:
+                        total_value = parsed
+                        total_confidence = confidence
+                        logger.debug(f"      ✅ Receipt Total: {total_value} (confidence: {confidence:.2%})")
+                        break
+            if total_value is not None:
+                break
+
+        if total_value is not None:
             return {
                 "success": True,
-                "family_coins": family_coins_value,
+                "total": total_value,
                 "raw_response": json.dumps(extracted_data, indent=2),
-                "confidence": family_coins_confidence,
-                "matched_field": matched_field_name
+                "confidence": total_confidence,
             }
-        
-        # If no Family Coins found, check if we have any data at all
+
         if extracted_data:
-            logger.warning(f"      ⚠️  Family Coins field not found in extracted data. Available fields: {list(extracted_data.keys())}")
+            logger.warning(f"      ⚠️  Receipt Total not found in prebuilt result. Available fields: {list(extracted_data.keys())}")
             return {
                 "success": False,
-                "family_coins": None,
+                "total": None,
                 "raw_response": json.dumps(extracted_data, indent=2),
-                "available_fields": list(extracted_data.keys())
+                "available_fields": list(extracted_data.keys()),
             }
-        
-        # No data extracted at all
+
         return {
             "success": False,
-            "family_coins": None,
+            "total": None,
             "raw_response": "No data extracted from document",
-            "available_fields": []
+            "available_fields": [],
         }
-            
+
     except ValueError as e:
-        logger.error(f"   ❌ Configuration error: {e}")
-        return {
-            "success": False,
-            "family_coins": None,
-            "raw_response": f"Configuration error: {str(e)}"
-        }
+        logger.error(f"   ❌ Azure Document Intelligence configuration error: {e}")
+        return {"success": False, "total": None, "raw_response": str(e)}
     except Exception as e:
-        logger.error(f"   ❌ Azure Document Intelligence API error: {e}")
-        return {
-            "success": False,
-            "family_coins": None,
-            "raw_response": f"Azure API error: {str(e)}"
-        }
+        logger.error(f"   ❌ Prebuilt Receipt API error: {e}")
+        return {"success": False, "total": None, "raw_response": str(e)}
 
 def _normalize_csv_key(key: str) -> str:
     """Convert snake_case to camelCase for CSV column names"""
@@ -176,6 +160,8 @@ def load_dataset(file_path: str) -> List[Dict[str, Any]]:
             "referenceid": "referenceId",
             "reference_id": "referenceId",
             "coins": "coins",
+            "fiatamount": "fiatAmount",
+            "fiat_amount": "fiatAmount",
         }
         
         result = []
@@ -190,14 +176,14 @@ def load_dataset(file_path: str) -> List[Dict[str, Any]]:
                 else:
                     camel_key = _normalize_csv_key(k) if "_" in k or " " in k else k
                     normalized[camel_key] = val
-            # Parse coins as int (required by pipeline)
-            if "coins" not in normalized:
-                normalized["coins"] = 0
-            else:
-                try:
-                    normalized["coins"] = int(float(str(normalized["coins"]).replace(",", "")))
-                except (ValueError, TypeError):
-                    normalized["coins"] = 0
+            for num_key in ("coins", "fiatAmount"):
+                if num_key not in normalized:
+                    normalized[num_key] = 0
+                else:
+                    try:
+                        normalized[num_key] = int(float(str(normalized[num_key]).replace(",", "")))
+                    except (ValueError, TypeError):
+                        normalized[num_key] = 0
             result.append(normalized)
         
         return result
@@ -205,51 +191,56 @@ def load_dataset(file_path: str) -> List[Dict[str, Any]]:
     raise ValueError(f"Unsupported file format: {ext}. Use .json or .csv")
 
 
-def categorize_difference(difference: int) -> str:
-    """Categorize the difference between dataset coins and extracted coins"""
-    if difference == 0:
+def categorize_difference(difference: float) -> str:
+    """Categorize the difference between expected fiat amount and extracted receipt total"""
+    diff_int = int(round(difference))
+    if diff_int == 0:
         return "exact_match"
-    elif abs(difference) <= 10:
+    if abs(diff_int) <= 10:
         return "low_rank"
-    elif abs(difference) <= 30:
+    if abs(diff_int) <= 30:
         return "medium_rank"
-    elif abs(difference) <= 70:
-        return "critical_rank"
-    else:
-        return "critical_rank"
+    return "critical_rank"
+
+def _get_fiat_amount(entry: Dict[str, Any]) -> int:
+    """Expected amount from JSON/CSV: fiatAmount preferred, else coins."""
+    v = entry.get("fiatAmount") if entry.get("fiatAmount") is not None else entry.get("coins", 0)
+    if isinstance(v, (int, float)):
+        return int(round(v))
+    try:
+        return int(float(str(v).replace(",", "")))
+    except (ValueError, TypeError):
+        return 0
+
 
 async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, Any]:
-    """Process the dataset file (JSON or CSV) and extract family coins from images"""
+    """Process the dataset file (JSON or CSV): extract Total from receipts and compare with fiatAmount."""
     
     logger.info(f"📂 Loading dataset from: {file_path}")
     
-    # Load dataset (supports JSON and CSV)
     dataset = load_dataset(file_path)
-    
     total_entries = len(dataset)
     logger.info(f"📊 Found {total_entries} entries to process")
     
-    # Initialize result structure
     exact_match = []
     low_rank = []
     medium_rank = []
     critical_rank = []
     errors = []
     no_image = []
-    
     processed = 0
-    
-    # Process each entry
+
     for entry_idx, entry in enumerate(dataset, 1):
+        image_path: Optional[str] = None
         try:
             receipt_number = entry.get("receiptNumber", f"entry_{entry_idx}")
             receipt_photo_url = entry.get("receiptPhotoUrl", "")
-            dataset_coins = entry.get("coins", 0)
+            fiat_amount = _get_fiat_amount(entry)
             to_user = entry.get("toUser", "Unknown")
             from_merchant = entry.get("fromMerchant")
             reference_id = entry.get("referenceId") or entry.get("reference_id")
-            
-            # Report current entry for live frontend updates (at start of processing)
+            dataset_coins = entry.get("coins", 0)  # keep for display/backward compat
+
             if analysis_id:
                 try:
                     from app.services.analysis_service import AnalysisService
@@ -268,10 +259,10 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                     )
                 except Exception as e:
                     logger.warning(f"      ⚠️  Failed to update current entry: {e}")
-            
-            logger.info(f"   🔄 [{entry_idx}/{total_entries}] Processing: {receipt_number}")
-            logger.info(f"      📊 Dataset coins: {dataset_coins}")
-            
+
+            logger.info(f"   🔄 [{entry_idx}/{total_entries}] Processing receipt #{receipt_number}")
+            logger.info(f"      📊 Expected fiat amount (from dataset): {fiat_amount}")
+
             if not receipt_photo_url:
                 logger.warning(f"      ⚠️  No receipt photo URL, skipping")
                 no_image.append({
@@ -279,15 +270,14 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                     "receipt_number": receipt_number,
                     "to_user": to_user,
                     "from_merchant": from_merchant,
-                    "dataset_coins": dataset_coins,
+                    "dataset_coins": fiat_amount,
                     "reference_id": reference_id
                 })
                 continue
-            
-            # Download image
+
             image_filename = f"{receipt_number}_{entry_idx}.jpg"
             image_path = os.path.join(settings.UPLOAD_DIR, "images", image_filename)
-            
+
             logger.info(f"      📥 Downloading image from: {receipt_photo_url}")
             if not download_image(receipt_photo_url, image_path):
                 errors.append({
@@ -296,49 +286,44 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                     "to_user": to_user,
                     "error": "Failed to download image",
                     "receipt_photo_url": receipt_photo_url,
-                    "dataset_coins": dataset_coins,
+                    "dataset_coins": fiat_amount,
                     "reference_id": reference_id
                 })
                 continue
-            
+
             logger.info(f"      ✅ Image downloaded: {image_path}")
-            
-            # Extract family coins using Azure Document Intelligence
-            logger.info(f"      🤖 Analyzing image with Azure Document Intelligence...")
-            extraction_result = extract_family_coins_from_image(image_path)
-            
-            if not extraction_result["success"] or extraction_result["family_coins"] is None:
-                logger.warning(f"      ⚠️  Could not extract family coins")
+            logger.info(f"      🤖 Extracting Total/Total Amount via Prebuilt Receipt model...")
+            extraction_result = extract_total_from_receipt(image_path)
+
+            if not extraction_result["success"] or extraction_result.get("total") is None:
                 errors.append({
                     "entry_id": str(entry_idx),
                     "receipt_number": receipt_number,
                     "to_user": to_user,
-                    "error": f"Failed to extract family coins: {extraction_result.get('raw_response', 'Unknown error')}",
+                    "error": f"Failed to extract Total from receipt: {extraction_result.get('raw_response', 'Unknown error')}",
                     "receipt_photo_url": receipt_photo_url,
-                    "dataset_coins": dataset_coins,
+                    "dataset_coins": fiat_amount,
                     "reference_id": reference_id
                 })
                 continue
-            
-            extracted_coins = extraction_result["family_coins"]
-            logger.info(f"      💰 Extracted family coins: {extracted_coins}")
-            
-            # Calculate difference
-            difference = dataset_coins - extracted_coins
-            logger.info(f"      📈 Difference: {difference} coins")
-            
-            # Categorize
+
+            extracted_total = extraction_result["total"]
+            extracted_int = int(round(extracted_total))
+            logger.info(f"      💰 Receipt total (extracted): {extracted_total}")
+
+            difference = fiat_amount - extracted_int
+            logger.info(f"      📈 Difference (fiat amount - receipt total): {difference}")
+
             category = categorize_difference(difference)
-            logger.info(f"      📈 Category: {category.upper()} | Difference: {difference} coins")
-            
-            # Create entry
+            logger.info(f"      📈 Category: {category.upper()} | Amount difference: {difference}")
+
             entry_data = {
                 "entry_id": str(entry_idx),
                 "receipt_number": receipt_number,
                 "to_user": to_user,
                 "from_merchant": from_merchant,
-                "dataset_coins": dataset_coins,
-                "extracted_family_coins": extracted_coins,
+                "dataset_coins": fiat_amount,
+                "extracted_family_coins": extracted_int,
                 "difference": difference,
                 "category": category,
                 "receipt_photo_url": receipt_photo_url,
@@ -346,8 +331,7 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 "azure_raw_response": extraction_result.get("raw_response"),
                 "extraction_confidence": extraction_result.get("confidence")
             }
-            
-            # Add to appropriate category
+
             if category == "exact_match":
                 exact_match.append(entry_data)
             elif category == "low_rank":
@@ -356,21 +340,18 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 medium_rank.append(entry_data)
             elif category == "critical_rank":
                 critical_rank.append(entry_data)
-            
+
             processed += 1
-            
-            # Progress update
             progress = (entry_idx / total_entries) * 100
             logger.info(f"      ✅ Progress: {progress:.1f}% ({processed}/{total_entries} processed)")
-            
-            # Update progress in database if analysis_id is provided
+
             if analysis_id:
                 try:
                     from app.services.analysis_service import AnalysisService
                     await AnalysisService.update_analysis_status(analysis_id, "processing", progress)
                 except Exception as e:
                     logger.warning(f"      ⚠️  Failed to update progress: {e}")
-            
+
         except Exception as e:
             logger.error(f"   ❌ Error processing entry {entry_idx}: {e}")
             errors.append({
@@ -379,9 +360,17 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 "to_user": entry.get("toUser", "Unknown"),
                 "error": str(e),
                 "receipt_photo_url": entry.get("receiptPhotoUrl", ""),
-                "dataset_coins": entry.get("coins", 0),
+                "dataset_coins": _get_fiat_amount(entry),
                 "reference_id": entry.get("referenceId") or entry.get("reference_id")
             })
+        finally:
+            # Remove downloaded receipt image to avoid growing disk usage.
+            if image_path and os.path.exists(image_path):
+                try:
+                    os.remove(image_path)
+                    logger.debug(f"      🧹 Removed temporary receipt image: {image_path}")
+                except Exception as e:
+                    logger.warning(f"      ⚠️ Failed to remove temporary image {image_path}: {e}")
     
     # Create summary
     summary = {
@@ -396,16 +385,16 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
         "no_image_count": len(no_image)
     }
     
-    logger.info(f"✅ Processing complete!")
-    logger.info(f"   📊 Summary:")
-    logger.info(f"      Total: {summary['total_entries']}")
+    logger.info("✅ Receipt processing complete (Prebuilt Receipt model)")
+    logger.info("   📊 Summary:")
+    logger.info(f"      Total entries: {summary['total_entries']}")
     logger.info(f"      Processed: {summary['processed']}")
-    logger.info(f"      Exact Match: {summary['exact_match_count']}")
-    logger.info(f"      Low Rank: {summary['low_rank_count']}")
-    logger.info(f"      Medium Rank: {summary['medium_rank_count']}")
-    logger.info(f"      Critical Rank: {summary['critical_rank_count']}")
+    logger.info(f"      Exact match (fiat = receipt total): {summary['exact_match_count']}")
+    logger.info(f"      Low rank: {summary['low_rank_count']}")
+    logger.info(f"      Medium rank: {summary['medium_rank_count']}")
+    logger.info(f"      Critical rank: {summary['critical_rank_count']}")
     logger.info(f"      Errors: {summary['error_count']}")
-    logger.info(f"      No Image: {summary['no_image_count']}")
+    logger.info(f"      No image: {summary['no_image_count']}")
     
     return {
         "summary": summary,
