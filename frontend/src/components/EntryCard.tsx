@@ -234,7 +234,7 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
             <ArrowRight className="w-5 h-5 text-muted-foreground shrink-0" />
             
             <div className="flex-1">
-              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Receipt total</p>
+              <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Invoice total</p>
               <div className="flex items-center gap-2">
                 <Coins className="w-5 h-5" style={{ color: 'hsl(var(--risk-color))' }} />
                 <span 
@@ -244,6 +244,11 @@ export const EntryCard = ({ entry, category, index }: EntryCardProps) => {
                   {analysisEntry.extracted_family_coins ?? 'N/A'}
                 </span>
               </div>
+              {analysisEntry.discount != null && analysisEntry.discount > 0 && analysisEntry.raw_total != null && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ({analysisEntry.raw_total} - {analysisEntry.discount} discount)
+                </p>
+              )}
             </div>
             
             <div className="flex-1 text-right">

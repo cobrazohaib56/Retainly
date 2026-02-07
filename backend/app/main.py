@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app
 app = FastAPI(
     title="Retainly API",
-    description="API for processing receipt images and extracting Total/Total Amount using Azure Prebuilt Receipt model",
+    description="API for processing invoice/receipt images and extracting InvoiceTotal, TotalDiscount using Azure Prebuilt Invoice model",
     version="1.0.0",
     lifespan=lifespan
 )

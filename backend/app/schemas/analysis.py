@@ -23,6 +23,12 @@ class AnalysisEntryResponse(BaseModel):
     image_path: Optional[str] = None
     azure_raw_response: Optional[str] = None
     extraction_confidence: Optional[float] = None
+    raw_total: Optional[float] = None
+    subtotal: Optional[float] = None
+    tax: Optional[float] = None
+    discount: Optional[float] = None
+    raw_total: Optional[float] = None
+    discount: Optional[float] = None
 
 
 class ErrorEntryResponse(BaseModel):

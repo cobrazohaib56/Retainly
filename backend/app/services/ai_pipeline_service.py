@@ -11,8 +11,8 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Prebuilt Receipt model ID (Azure normalizes "Total", "Total Amount", "Grand Total" etc. to this field)
-PREBUILT_RECEIPT_MODEL_ID = "prebuilt-receipt"
+# Prebuilt Invoice model ID – has TotalDiscount, InvoiceTotal, SubTotal, TotalTax, AmountDue
+PREBUILT_INVOICE_MODEL_ID = "prebuilt-invoice"
 
 def get_azure_client() -> DocumentIntelligenceClient:
     """Get Azure Document Intelligence client instance"""
@@ -56,48 +56,114 @@ def _parse_total_value(value: Any) -> Optional[float]:
 
 
 def extract_total_from_receipt(image_path: str) -> Dict[str, Any]:
-    """Extract Total (or Total Amount) from receipt image using Azure Prebuilt Receipt model only.
-    The prebuilt model normalizes 'Total', 'Total Amount', 'Grand Total', etc. into a single 'Total' field.
-    No custom model is used.
+    """Extract InvoiceTotal, TotalDiscount, SubTotal, and TotalTax from image
+    using Azure Prebuilt Invoice model (prebuilt-invoice).
+
+    The prebuilt-invoice model provides:
+      - InvoiceTotal  : the headline total on the document
+      - TotalDiscount : discount amount (if present)
+      - SubTotal      : subtotal before tax/discount
+      - TotalTax      : tax amount
+
+    Comparison value returned as 'total':
+      - If TotalDiscount exists : InvoiceTotal - TotalDiscount
+      - Otherwise               : InvoiceTotal as-is
     """
     try:
         client = get_azure_client()
         with open(image_path, "rb") as f:
-            poller = client.begin_analyze_document(model_id=PREBUILT_RECEIPT_MODEL_ID, body=f)
+            poller = client.begin_analyze_document(model_id=PREBUILT_INVOICE_MODEL_ID, body=f)
         result = poller.result()
 
         extracted_data = {}
-        total_value = None
-        total_confidence = None
+        invoice_total = None
+        invoice_total_confidence = None
+        total_discount = None
+        sub_total = None
+        total_tax = None
+        amount_due = None
 
         for document in result.documents:
             logger.debug(f"      📄 Document type: {document.doc_type}")
+            logger.debug(f"      📋 Available fields: {list(document.fields.keys())}")
+
             for field_name, field in document.fields.items():
                 value = getattr(field, "content", None) or getattr(field, "value", None)
                 confidence = getattr(field, "confidence", None) or 0.0
                 extracted_data[field_name] = {"value": value, "confidence": confidence}
 
-                # Prebuilt receipt uses "Total" (normalized from Total Amount, Grand Total, etc.)
-                if field_name == "Total":
+                # Log every field for debugging
+                logger.debug(f"      🔍 Field '{field_name}': {value}")
+
+                if field_name == "InvoiceTotal":
                     parsed = _parse_total_value(value)
                     if parsed is not None:
-                        total_value = parsed
-                        total_confidence = confidence
-                        logger.debug(f"      ✅ Receipt Total: {total_value} (confidence: {confidence:.2%})")
-                        break
-            if total_value is not None:
-                break
+                        invoice_total = parsed
+                        invoice_total_confidence = confidence
+                        logger.info(f"      ✅ InvoiceTotal: {invoice_total} (confidence: {confidence:.2%})")
 
-        if total_value is not None:
+                elif field_name == "TotalDiscount":
+                    parsed = _parse_total_value(value)
+                    if parsed is not None:
+                        total_discount = parsed
+                        logger.info(f"      ✅ TotalDiscount: {total_discount} (confidence: {confidence:.2%})")
+
+                elif field_name == "SubTotal":
+                    parsed = _parse_total_value(value)
+                    if parsed is not None:
+                        sub_total = parsed
+                        logger.info(f"      ✅ SubTotal: {sub_total} (confidence: {confidence:.2%})")
+
+                elif field_name == "TotalTax":
+                    parsed = _parse_total_value(value)
+                    if parsed is not None:
+                        total_tax = parsed
+                        logger.info(f"      ✅ TotalTax: {total_tax} (confidence: {confidence:.2%})")
+
+                elif field_name == "AmountDue":
+                    parsed = _parse_total_value(value)
+                    if parsed is not None:
+                        amount_due = parsed
+                        logger.info(f"      ✅ AmountDue: {amount_due} (confidence: {confidence:.2%})")
+
+        # Determine the comparison value
+        if invoice_total is not None:
+            if total_discount is not None and total_discount > 0:
+                net_amount = invoice_total - total_discount
+                logger.info(f"      💰 InvoiceTotal ({invoice_total}) - TotalDiscount ({total_discount}) = {net_amount}")
+            else:
+                net_amount = invoice_total
+                logger.info(f"      💰 No discount found, using InvoiceTotal: {net_amount}")
+
             return {
                 "success": True,
-                "total": total_value,
+                "total": net_amount,
+                "raw_total": invoice_total,
+                "subtotal": sub_total,
+                "tax": total_tax,
+                "discount": total_discount,
+                "amount_due": amount_due,
                 "raw_response": json.dumps(extracted_data, indent=2),
-                "confidence": total_confidence,
+                "confidence": invoice_total_confidence,
+            }
+
+        # Fallback: if InvoiceTotal not found but AmountDue exists
+        if amount_due is not None:
+            logger.info(f"      💰 InvoiceTotal not found, falling back to AmountDue: {amount_due}")
+            return {
+                "success": True,
+                "total": amount_due,
+                "raw_total": amount_due,
+                "subtotal": sub_total,
+                "tax": total_tax,
+                "discount": total_discount,
+                "amount_due": amount_due,
+                "raw_response": json.dumps(extracted_data, indent=2),
+                "confidence": None,
             }
 
         if extracted_data:
-            logger.warning(f"      ⚠️  Receipt Total not found in prebuilt result. Available fields: {list(extracted_data.keys())}")
+            logger.warning(f"      ⚠️  InvoiceTotal not found. Available fields: {list(extracted_data.keys())}")
             return {
                 "success": False,
                 "total": None,
@@ -116,7 +182,7 @@ def extract_total_from_receipt(image_path: str) -> Dict[str, Any]:
         logger.error(f"   ❌ Azure Document Intelligence configuration error: {e}")
         return {"success": False, "total": None, "raw_response": str(e)}
     except Exception as e:
-        logger.error(f"   ❌ Prebuilt Receipt API error: {e}")
+        logger.error(f"   ❌ Prebuilt Invoice API error: {e}")
         return {"success": False, "total": None, "raw_response": str(e)}
 
 def _normalize_csv_key(key: str) -> str:
@@ -192,7 +258,7 @@ def load_dataset(file_path: str) -> List[Dict[str, Any]]:
 
 
 def categorize_difference(difference: float) -> str:
-    """Categorize the difference between expected fiat amount and extracted receipt total"""
+    """Categorize the difference between expected fiat amount and extracted invoice total"""
     diff_int = int(round(difference))
     if diff_int == 0:
         return "exact_match"
@@ -292,7 +358,7 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 continue
 
             logger.info(f"      ✅ Image downloaded: {image_path}")
-            logger.info(f"      🤖 Extracting Total/Total Amount via Prebuilt Receipt model...")
+            logger.info(f"      🤖 Extracting InvoiceTotal/TotalDiscount via Prebuilt Invoice model...")
             extraction_result = extract_total_from_receipt(image_path)
 
             if not extraction_result["success"] or extraction_result.get("total") is None:
@@ -300,7 +366,7 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                     "entry_id": str(entry_idx),
                     "receipt_number": receipt_number,
                     "to_user": to_user,
-                    "error": f"Failed to extract Total from receipt: {extraction_result.get('raw_response', 'Unknown error')}",
+                    "error": f"Failed to extract InvoiceTotal from document: {extraction_result.get('raw_response', 'Unknown error')}",
                     "receipt_photo_url": receipt_photo_url,
                     "dataset_coins": fiat_amount,
                     "reference_id": reference_id
@@ -309,10 +375,18 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
 
             extracted_total = extraction_result["total"]
             extracted_int = int(round(extracted_total))
-            logger.info(f"      💰 Receipt total (extracted): {extracted_total}")
+            raw_total = extraction_result.get("raw_total")
+            subtotal = extraction_result.get("subtotal")
+            tax = extraction_result.get("tax")
+            discount = extraction_result.get("discount")
+            
+            if discount and discount > 0:
+                logger.info(f"      💰 Invoice: Total={raw_total}, Discount={discount}, Net={extracted_total}")
+            else:
+                logger.info(f"      💰 Invoice total (extracted): {extracted_total}")
 
             difference = fiat_amount - extracted_int
-            logger.info(f"      📈 Difference (fiat amount - receipt total): {difference}")
+            logger.info(f"      📈 Difference (fiat amount - invoice total): {difference}")
 
             category = categorize_difference(difference)
             logger.info(f"      📈 Category: {category.upper()} | Amount difference: {difference}")
@@ -329,7 +403,11 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
                 "receipt_photo_url": receipt_photo_url,
                 "image_path": image_path,
                 "azure_raw_response": extraction_result.get("raw_response"),
-                "extraction_confidence": extraction_result.get("confidence")
+                "extraction_confidence": extraction_result.get("confidence"),
+                "raw_total": raw_total,
+                "subtotal": subtotal,
+                "tax": tax,
+                "discount": discount
             }
 
             if category == "exact_match":
@@ -385,11 +463,11 @@ async def process_dataset(file_path: str, analysis_id: str = None) -> Dict[str, 
         "no_image_count": len(no_image)
     }
     
-    logger.info("✅ Receipt processing complete (Prebuilt Receipt model)")
+    logger.info("✅ Invoice processing complete (Prebuilt Invoice model)")
     logger.info("   📊 Summary:")
     logger.info(f"      Total entries: {summary['total_entries']}")
     logger.info(f"      Processed: {summary['processed']}")
-    logger.info(f"      Exact match (fiat = receipt total): {summary['exact_match_count']}")
+    logger.info(f"      Exact match (fiat = invoice total): {summary['exact_match_count']}")
     logger.info(f"      Low rank: {summary['low_rank_count']}")
     logger.info(f"      Medium rank: {summary['medium_rank_count']}")
     logger.info(f"      Critical rank: {summary['critical_rank_count']}")

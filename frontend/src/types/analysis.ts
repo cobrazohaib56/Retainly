@@ -10,6 +10,10 @@ export interface AnalysisEntry {
   receipt_photo_url: string;
   image_path?: string;
   gemini_raw_response?: string;
+  raw_total?: number | null;
+  subtotal?: number | null;
+  tax?: number | null;
+  discount?: number | null;
 }
 
 export interface ErrorEntry {

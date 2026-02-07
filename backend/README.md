@@ -1,6 +1,6 @@
 # Retainly Backend API
 
-FastAPI backend for processing receipt images and extracting Total/Total Amount using Azure Prebuilt Receipt model.
+FastAPI backend for processing invoice/receipt images and extracting InvoiceTotal, TotalDiscount using Azure Prebuilt Invoice model.
 
 ## Setup
 
